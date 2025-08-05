@@ -1,10 +1,12 @@
-import fetch from 'node-fetch';
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).end('Method Not Allowed');
   }
+
+  // Use dynamic import for node-fetch to avoid issues with Vercel's module handling
+  const fetch = (...args) =>
+    import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
   const userMessage = req.body.message;
 
@@ -16,7 +18,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4-mini',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -28,11 +30,17 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
+
+    if (data.error) {
+      console.error('OpenAI API Error:', data.error);
+      return res.status(500).json({ reply: 'Error from OpenAI: ' + data.error.message });
+    }
+
     const reply = data.choices?.[0]?.message?.content ?? 'Hmm, something went wrong.';
     res.status(200).json({ reply });
 
   } catch (err) {
-    console.error('OpenAI error:', err);
+    console.error('Server error:', err);
     res.status(500).json({ reply: 'Server error — please try again later.' });
   }
 }
